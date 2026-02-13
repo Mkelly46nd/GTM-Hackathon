@@ -1,0 +1,18 @@
+# Secrets – never commit
+.env
+.env.local
+*.pem
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+env/
+
+# Generated results (optional: remove these lines if you want to commit sample results)
+deduplication_results.json
+deduplication_results.csv
+
+# OS
+.DS_Store
+Thumbs.db

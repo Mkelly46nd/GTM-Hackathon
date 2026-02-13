@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deduplication Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #09090b;
+      --surface: #131316;
+      --surface2: #1c1c21;
+      --surface3: #26262c;
+      --border: #2a2a32;
+      --border-focus: #3f3f4a;
+      --text: #fafafa;
+      --text2: #a1a1aa;
+      --text3: #71717a;
+      --green: #22c55e;
+      --green-dim: rgba(34,197,94,0.12);
+      --blue: #3b82f6;
+      --blue-dim: rgba(59,130,246,0.12);
+      --amber: #f59e0b;
+      --amber-dim: rgba(245,158,11,0.12);
+      --red: #ef4444;
+      --purple: #a78bfa;
+      --purple-dim: rgba(167,139,250,0.12);
+      --radius: 8px;
+      --radius-lg: 12px;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+    .app { max-width: 1440px; margin: 0 auto; padding: 24px; }
+
+    /* -- Header -- */
+    .header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+    .header-left h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .header-left p { font-size: 13px; color: var(--text3); margin-top: 2px; }
+    .header-right { display: flex; gap: 8px; align-items: center; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--text); transition: all 0.15s; }
+    .btn:hover { background: var(--surface3); border-color: var(--border-focus); }
+    .btn-primary { background: var(--green); color: #000; border-color: var(--green); }
+    .btn-primary:hover { background: #16a34a; }
+    .btn svg { width: 15px; height: 15px; }
+    .btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    input[type="file"] { display: none; }
+
+    /* -- Stats row -- */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 20px; }
+    .stat-value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .stat-value.green { color: var(--green); }
+    .stat-value.blue { color: var(--blue); }
+    .stat-value.amber { color: var(--amber); }
+    .stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; font-weight: 500; }
+
+    /* -- Breakdown pills -- */
+    .breakdown { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid var(--border); background: var(--surface); }
+    .pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .pill .num { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pill.det-high .dot { background: var(--green); }
+    .pill.det-high .num { color: var(--green); }
+    .pill.det-med .dot { background: var(--blue); }
+    .pill.det-med .num { color: var(--blue); }
+    .pill.prob-high .dot { background: var(--purple); }
+    .pill.prob-high .num { color: var(--purple); }
+    .pill.prob-med .dot { background: var(--amber); }
+    .pill.prob-med .num { color: var(--amber); }
+
+    /* -- Toolbar -- */
+    .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .toolbar select, .toolbar input {
+      padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-family: var(--font); font-size: 13px;
+      outline: none; transition: border-color 0.15s;
+    }
+    .toolbar select:focus, .toolbar input:focus { border-color: var(--border-focus); }
+    .toolbar input { width: 260px; }
+    .toolbar .count { font-size: 12px; color: var(--text3); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+    /* -- Table -- */
+    .table-container { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      padding: 10px 16px; text-align: left; background: var(--surface2); color: var(--text3);
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border); white-space: nowrap; cursor: pointer; user-select: none;
+      position: sticky; top: 0; z-index: 1;
+    }
+    thead th:hover { color: var(--text2); }
+    thead th .sort-arrow { margin-left: 4px; font-size: 10px; opacity: 0.5; }
+    thead th.sorted .sort-arrow { opacity: 1; color: var(--green); }
+    tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background 0.1s; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    tbody tr.expanded { background: var(--surface2); }
+    tbody tr.clickable { cursor: pointer; }
+
+    /* -- Contact cell -- */
+    .contact { max-width: 220px; }
+    .contact .name { font-weight: 600; font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact .email { font-size: 12px; color: var(--text3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .contact .company { font-size: 11px; color: var(--text3); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* -- Match type badge -- */
+    .type-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .type-badge.deterministic_high { background: var(--green-dim); color: var(--green); }
+    .type-badge.deterministic_medium { background: var(--blue-dim); color: var(--blue); }
+    .type-badge.probabilistic_high { background: var(--purple-dim); color: var(--purple); }
+    .type-badge.probabilistic_medium { background: var(--amber-dim); color: var(--amber); }
+
+    /* -- Action badge -- */
+    .action { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .action.auto_merge { background: var(--green-dim); color: var(--green); }
+    .action.review_merge { background: var(--amber-dim); color: var(--amber); }
+    .action.manual_review { background: rgba(255,255,255,0.06); color: var(--text3); }
+
+    /* -- Confidence bar -- */
+    .conf-cell { white-space: nowrap; }
+    .conf-bar { display: inline-block; width: 40px; height: 5px; border-radius: 3px; background: var(--surface3); overflow: hidden; vertical-align: middle; margin-right: 6px; }
+    .conf-bar-fill { height: 100%; border-radius: 3px; }
+    .conf-val { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; font-family: var(--mono); }
+
+    /* -- Expand row (detail panel) -- */
+    .detail-row td { padding: 0 !important; border-bottom: 1px solid var(--border); }
+    .detail-panel { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: var(--surface2); }
+    .detail-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+    .detail-card h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 8px; }
+    .detail-card .field { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+    .detail-card .field-label { color: var(--text3); }
+    .detail-card .field-value { color: var(--text); font-weight: 500; text-align: right; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .detail-card .survivor-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; background: var(--green-dim); color: var(--green); font-size: 10px; font-weight: 600; text-transform: uppercase; margin-left: 6px; }
+    .detail-card .matching-fields { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .detail-card .field-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; background: var(--surface3); font-size: 11px; color: var(--text2); }
+
+    /* -- Cluster view -- */
+    .cluster-group { margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); }
+    .cluster-header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--surface2); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+    .cluster-header:hover { background: var(--surface3); }
+    .cluster-header .cluster-name { font-weight: 600; font-size: 14px; }
+    .cluster-header .cluster-count { font-size: 12px; color: var(--text3); background: var(--surface3); padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+    .cluster-header .cluster-best-type { margin-left: auto; }
+    .cluster-header .chevron { color: var(--text3); font-size: 12px; transition: transform 0.2s; }
+    .cluster-header.open .chevron { transform: rotate(90deg); }
+    .cluster-body { display: none; }
+    .cluster-body.open { display: block; }
+    .cluster-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; padding: 16px 20px; }
+    .cluster-contact-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; position: relative; }
+    .cluster-contact-card.is-survivor { border-color: var(--green); border-width: 2px; }
+    .cluster-contact-card .cc-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .cluster-contact-card .cc-field { font-size: 12px; color: var(--text3); padding: 2px 0; display: flex; gap: 8px; }
+    .cluster-contact-card .cc-field .cc-label { color: var(--text3); min-width: 60px; }
+    .cluster-contact-card .cc-field .cc-val { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cluster-contact-card .cc-survivor { position: absolute; top: 8px; right: 10px; font-size: 10px; font-weight: 700; color: var(--green); background: var(--green-dim); padding: 2px 6px; border-radius: 3px; text-transform: uppercase; }
+    .cluster-contact-card .cc-merge-badge { position: absolute; top: 8px; right: 10px; font-size: 10px; font-weight: 700; color: var(--amber); background: var(--amber-dim); padding: 2px 6px; border-radius: 3px; text-transform: uppercase; }
+    .cluster-contact-card .cc-score { font-size: 11px; color: var(--blue); font-weight: 600; margin-bottom: 6px; }
+    .cluster-matches { padding: 0 20px 16px; }
+    .cluster-match-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--surface2); border-radius: var(--radius); margin-bottom: 6px; font-size: 12px; }
+    .cluster-match-row .cmr-pair { color: var(--text2); flex: 1; }
+    .cluster-match-row .cmr-explanation { color: var(--text3); flex: 2; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* -- Empty state -- */
+    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; color: var(--text3); }
+    .empty svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.3; }
+    .empty p { font-size: 14px; }
+
+    /* -- Footer -- */
+    .footer { padding-top: 16px; font-size: 11px; color: var(--text3); display: flex; justify-content: space-between; }
+
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .detail-panel { grid-template-columns: 1fr; }
+      .cluster-contacts { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <h1>Deduplication Report</h1>
+      <p>Contact duplicate detection results</p>
+    </div>
+    <div class="header-right">
+      <button class="btn" id="view-toggle" onclick="toggleView()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Cluster view
+      </button>
+      <label class="btn-primary btn" for="file-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Load JSON
+      </label>
+      <input type="file" id="file-input" accept=".json">
+    </div>
+  </div>
+
+  <div id="report" style="display:none;">
+    <div class="stats" id="stats"></div>
+    <div class="breakdown" id="breakdown"></div>
+    <div class="toolbar">
+      <select id="f-type">
+        <option value="">All types</option>
+        <option value="deterministic_high">Deterministic high</option>
+        <option value="deterministic_medium">Deterministic medium</option>
+        <option value="probabilistic_high">Probabilistic high</option>
+        <option value="probabilistic_medium">Probabilistic medium</option>
+      </select>
+      <select id="f-action">
+        <option value="">All actions</option>
+        <option value="auto_merge">Auto merge</option>
+        <option value="review_merge">Review merge</option>
+        <option value="manual_review">Manual review</option>
+      </select>
+      <input type="text" id="f-search" placeholder="Search name, email, company...">
+      <span class="count" id="match-count"></span>
+    </div>
+
+    <!-- Pairs view (default) -->
+    <div id="pairs-view">
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="contact_1_name">Contact 1 <span class="sort-arrow"></span></th>
+              <th data-col="contact_2_name">Contact 2 <span class="sort-arrow"></span></th>
+              <th data-col="match_type">Type <span class="sort-arrow"></span></th>
+              <th data-col="confidence_score">Confidence <span class="sort-arrow"></span></th>
+              <th data-col="matching_fields">Matching Fields</th>
+              <th data-col="recommended_action">Action <span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Cluster view -->
+    <div id="cluster-view" style="display:none;"></div>
+
+    <div class="footer">
+      <span id="gen-at"></span>
+      <span>CRM Contact Deduplication Engine</span>
+    </div>
+  </div>
+
+  <div id="empty-state" class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <p>Load <code>deduplication_results.json</code> to view the report</p>
+  </div>
+</div>
+
+<script>
+let DATA = null;
+let sortCol = 'confidence_score';
+let sortDir = -1;
+let expandedRow = null;
+let viewMode = 'pairs'; // 'pairs' or 'clusters'
+
+const esc = s => { if(s==null) return ''; const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; };
+
+const typeOrder = { deterministic_high: 0, deterministic_medium: 1, probabilistic_high: 2, probabilistic_medium: 3 };
+const typeLabel = { deterministic_high: 'Exact', deterministic_medium: 'Strong', probabilistic_high: 'Likely', probabilistic_medium: 'Possible' };
+const actionLabel = { auto_merge: 'Auto merge', review_merge: 'Review', manual_review: 'Manual' };
+
+function confColor(v) {
+  if (v >= 0.9) return 'var(--green)';
+  if (v >= 0.8) return 'var(--blue)';
+  if (v >= 0.7) return 'var(--purple)';
+  return 'var(--amber)';
+}
+
+function renderStats(s) {
+  document.getElementById('stats').innerHTML = [
+    { v: s.total_contacts, l: 'Total Contacts', c: '' },
+    { v: s.total_matches, l: 'Duplicate Pairs', c: 'amber' },
+    { v: s.total_clusters, l: 'Clusters', c: 'blue' },
+    { v: s.duplicates_to_remove, l: 'To Remove', c: 'green' },
+  ].map(i => `<div class="stat"><div class="stat-value ${i.c}">${i.v}</div><div class="stat-label">${i.l}</div></div>`).join('');
+}
+
+function renderBreakdown(b) {
+  const items = [
+    { key: 'deterministic_high', cls: 'det-high', label: 'Exact match' },
+    { key: 'deterministic_medium', cls: 'det-med', label: 'Strong match' },
+    { key: 'probabilistic_high', cls: 'prob-high', label: 'Likely match' },
+    { key: 'probabilistic_medium', cls: 'prob-med', label: 'Possible match' },
+  ];
+  document.getElementById('breakdown').innerHTML = items
+    .filter(i => (b[i.key] || 0) > 0)
+    .map(i => `<span class="pill ${i.cls}"><span class="dot"></span><span class="num">${b[i.key]}</span> ${i.label}</span>`)
+    .join('');
+}
+
+/* ===================== PAIRS VIEW ===================== */
+
+function getFiltered() {
+  if (!DATA) return [];
+  const ft = document.getElementById('f-type').value;
+  const fa = document.getElementById('f-action').value;
+  const fs = (document.getElementById('f-search').value || '').toLowerCase();
+  let rows = DATA.matches;
+  if (ft) rows = rows.filter(m => m.match_type === ft);
+  if (fa) rows = rows.filter(m => m.recommended_action === fa);
+  if (fs) rows = rows.filter(m => {
+    const t = [m.contact_1_name, m.contact_1_email, m.contact_1_company,
+               m.contact_2_name, m.contact_2_email, m.contact_2_company].filter(Boolean).join(' ').toLowerCase();
+    return t.includes(fs);
+  });
+  rows = [...rows].sort((a, b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (sortCol === 'match_type') { va = typeOrder[va] ?? 9; vb = typeOrder[vb] ?? 9; }
+    if (sortCol === 'matching_fields') { va = (va||[]).length; vb = (vb||[]).length; }
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb||'').toLowerCase(); }
+    if (va < vb) return -1 * sortDir;
+    if (va > vb) return 1 * sortDir;
+    return 0;
+  });
+  return rows;
+}
+
+function renderPairsTable() {
+  const rows = getFiltered();
+  document.getElementById('match-count').textContent = `${rows.length} match${rows.length !== 1 ? 'es' : ''}`;
+  const tbody = document.getElementById('tbody');
+  expandedRow = null;
+
+  tbody.innerHTML = rows.map((m, idx) => {
+    const isSurvivor1 = String(m.survivor_recommendation) === String(m.contact_1_id);
+    const isSurvivor2 = String(m.survivor_recommendation) === String(m.contact_2_id);
+    return `
+    <tr class="clickable" data-idx="${idx}" onclick="toggleDetail(this, ${idx})">
+      <td class="contact">
+        <div class="name">${esc(m.contact_1_name || '\u2014')}${isSurvivor1 ? ' <span style="color:var(--green);font-size:10px;">KEEP</span>' : ''}</div>
+        <div class="email">${esc(m.contact_1_email || '')}</div>
+        <div class="company">${esc(m.contact_1_company || '')}</div>
+      </td>
+      <td class="contact">
+        <div class="name">${esc(m.contact_2_name || '\u2014')}${isSurvivor2 ? ' <span style="color:var(--green);font-size:10px;">KEEP</span>' : ''}</div>
+        <div class="email">${esc(m.contact_2_email || '')}</div>
+        <div class="company">${esc(m.contact_2_company || '')}</div>
+      </td>
+      <td><span class="type-badge ${m.match_type}">${typeLabel[m.match_type] || m.match_type}</span></td>
+      <td class="conf-cell">
+        <span class="conf-bar"><span class="conf-bar-fill" style="width:${m.confidence_score*100}%; background:${confColor(m.confidence_score)}"></span></span>
+        <span class="conf-val">${(m.confidence_score*100).toFixed(0)}%</span>
+      </td>
+      <td style="font-size:12px;color:var(--text2);">${esc((m.matching_fields||[]).join(', '))}</td>
+      <td><span class="action ${(m.recommended_action||'').replace(/-/g,'_')}">${actionLabel[m.recommended_action] || m.recommended_action || ''}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === sortCol);
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = th.dataset.col === sortCol ? (sortDir === 1 ? '\u25B2' : '\u25BC') : '';
+  });
+}
+
+function toggleDetail(tr, idx) {
+  const existing = tr.nextElementSibling;
+  if (existing && existing.classList.contains('detail-row')) {
+    existing.remove();
+    tr.classList.remove('expanded');
+    expandedRow = null;
+    return;
+  }
+  document.querySelectorAll('.detail-row').forEach(r => { r.previousElementSibling?.classList.remove('expanded'); r.remove(); });
+
+  const m = getFiltered()[idx];
+  if (!m) return;
+
+  const isSurvivor1 = String(m.survivor_recommendation) === String(m.contact_1_id);
+  const isSurvivor2 = String(m.survivor_recommendation) === String(m.contact_2_id);
+
+  const detailTr = document.createElement('tr');
+  detailTr.className = 'detail-row';
+  detailTr.innerHTML = `<td colspan="6">
+    <div class="detail-panel">
+      <div class="detail-card">
+        <h4>Contact 1 ${isSurvivor1 ? '<span class="survivor-badge">Survivor</span>' : ''}</h4>
+        <div class="field"><span class="field-label">ID</span><span class="field-value" style="font-family:var(--mono);font-size:12px;">${esc(m.contact_1_id)}</span></div>
+        <div class="field"><span class="field-label">Name</span><span class="field-value">${esc(m.contact_1_name)}</span></div>
+        <div class="field"><span class="field-label">Email</span><span class="field-value">${esc(m.contact_1_email)}</span></div>
+        <div class="field"><span class="field-label">Company</span><span class="field-value">${esc(m.contact_1_company)}</span></div>
+        <div class="field"><span class="field-label">Phone</span><span class="field-value">${esc(m.contact_1_phone || '\u2014')}</span></div>
+        <div class="field"><span class="field-label">Title</span><span class="field-value">${esc(m.contact_1_title || '\u2014')}</span></div>
+      </div>
+      <div class="detail-card">
+        <h4>Contact 2 ${isSurvivor2 ? '<span class="survivor-badge">Survivor</span>' : ''}</h4>
+        <div class="field"><span class="field-label">ID</span><span class="field-value" style="font-family:var(--mono);font-size:12px;">${esc(m.contact_2_id)}</span></div>
+        <div class="field"><span class="field-label">Name</span><span class="field-value">${esc(m.contact_2_name)}</span></div>
+        <div class="field"><span class="field-label">Email</span><span class="field-value">${esc(m.contact_2_email)}</span></div>
+        <div class="field"><span class="field-label">Company</span><span class="field-value">${esc(m.contact_2_company)}</span></div>
+        <div class="field"><span class="field-label">Phone</span><span class="field-value">${esc(m.contact_2_phone || '\u2014')}</span></div>
+        <div class="field"><span class="field-label">Title</span><span class="field-value">${esc(m.contact_2_title || '\u2014')}</span></div>
+      </div>
+    </div>
+    <div style="padding:0 20px 16px; background: var(--surface2);">
+      <div class="detail-card" style="margin-top:0;">
+        <h4>Match Details</h4>
+        <div class="field"><span class="field-label">Confidence</span><span class="field-value">${(m.confidence_score*100).toFixed(1)}%</span></div>
+        <div class="field"><span class="field-label">Explanation</span><span class="field-value">${esc(m.explanation)}</span></div>
+        <div style="margin-top:8px;"><span class="field-label" style="color:var(--text3);font-size:12px;">Matching fields</span>
+          <div class="matching-fields">${(m.matching_fields||[]).map(f => `<span class="field-tag">${esc(f)}</span>`).join('')}</div>
+        </div>
+      </div>
+    </div>
+  </td>`;
+
+  tr.after(detailTr);
+  tr.classList.add('expanded');
+  expandedRow = idx;
+}
+
+/* ===================== CLUSTER VIEW ===================== */
+
+function buildClusterData() {
+  if (!DATA || !DATA.clusters) return [];
+  const fs = (document.getElementById('f-search').value || '').toLowerCase();
+  const ft = document.getElementById('f-type').value;
+  const fa = document.getElementById('f-action').value;
+
+  // Build contact lookup — prefer the rich contacts dict, fallback to matches
+  const contactInfo = {};
+  if (DATA.contacts && typeof DATA.contacts === 'object') {
+    for (const [cid, c] of Object.entries(DATA.contacts)) {
+      contactInfo[String(cid)] = c;
+    }
+  }
+  // Also backfill from matches (for any contact not in the contacts dict)
+  for (const m of DATA.matches) {
+    if (!contactInfo[String(m.contact_1_id)]) {
+      contactInfo[String(m.contact_1_id)] = {
+        id: m.contact_1_id, name: m.contact_1_name || '', email: m.contact_1_email || '',
+        company: m.contact_1_company || '', phone: m.contact_1_phone || '', title: m.contact_1_title || '',
+      };
+    }
+    if (!contactInfo[String(m.contact_2_id)]) {
+      contactInfo[String(m.contact_2_id)] = {
+        id: m.contact_2_id, name: m.contact_2_name || '', email: m.contact_2_email || '',
+        company: m.contact_2_company || '', phone: m.contact_2_phone || '', title: m.contact_2_title || '',
+      };
+    }
+  }
+
+  // Find survivor for each cluster — use survivor_score if available, else most frequent recommendation
+  const clusterSurvivors = {};
+  for (const [clusterId, memberIds] of Object.entries(DATA.clusters)) {
+    const memberStrs = memberIds.map(String);
+    // Try score-based approach first
+    let bestSurvivor = null, bestScore = -1;
+    for (const mid of memberStrs) {
+      const c = contactInfo[mid];
+      if (c && typeof c.survivor_score === 'number' && c.survivor_score > bestScore) {
+        bestScore = c.survivor_score;
+        bestSurvivor = mid;
+      }
+    }
+    // Fallback: most frequent survivor recommendation from matches
+    if (!bestSurvivor) {
+      const survivorCounts = {};
+      for (const m of DATA.matches) {
+        const id1 = String(m.contact_1_id), id2 = String(m.contact_2_id);
+        if (memberStrs.includes(id1) && memberStrs.includes(id2) && m.survivor_recommendation) {
+          const sv = String(m.survivor_recommendation);
+          survivorCounts[sv] = (survivorCounts[sv] || 0) + 1;
+        }
+      }
+      let bestCount = 0;
+      for (const [sv, count] of Object.entries(survivorCounts)) {
+        if (count > bestCount) { bestSurvivor = sv; bestCount = count; }
+      }
+    }
+    clusterSurvivors[clusterId] = bestSurvivor;
+  }
+
+  const clusters = [];
+  for (const [clusterId, memberIds] of Object.entries(DATA.clusters)) {
+    const memberStrs = memberIds.map(String);
+    const contacts = memberStrs.map(id => contactInfo[id]).filter(Boolean);
+    if (contacts.length === 0) continue;
+
+    // Get matches for this cluster
+    const clusterMatches = DATA.matches.filter(m => {
+      const id1 = String(m.contact_1_id), id2 = String(m.contact_2_id);
+      return memberStrs.includes(id1) && memberStrs.includes(id2);
+    });
+
+    // Apply filters
+    if (ft && !clusterMatches.some(m => m.match_type === ft)) continue;
+    if (fa && !clusterMatches.some(m => m.recommended_action === fa)) continue;
+    if (fs) {
+      const allText = contacts.map(c => [c.name, c.email, c.company].join(' ')).join(' ').toLowerCase();
+      if (!allText.includes(fs)) continue;
+    }
+
+    // Best match type in cluster
+    const bestType = clusterMatches.reduce((best, m) => {
+      return (typeOrder[m.match_type] ?? 9) < (typeOrder[best] ?? 9) ? m.match_type : best;
+    }, 'probabilistic_medium');
+
+    // Primary name for the cluster
+    const primaryName = contacts[0]?.name || 'Unknown';
+
+    clusters.push({
+      id: clusterId,
+      name: primaryName,
+      contacts,
+      matches: clusterMatches,
+      bestType,
+      survivorId: clusterSurvivors[clusterId],
+      size: contacts.length,
+    });
+  }
+
+  // Sort: largest clusters first, then by name
+  clusters.sort((a, b) => b.size - a.size || a.name.localeCompare(b.name));
+  return clusters;
+}
+
+function renderClusterView() {
+  const clusters = buildClusterData();
+  const container = document.getElementById('cluster-view');
+  document.getElementById('match-count').textContent = `${clusters.length} cluster${clusters.length !== 1 ? 's' : ''}`;
+
+  if (clusters.length === 0) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);">No clusters match filters</div>';
+    return;
+  }
+
+  container.innerHTML = clusters.map((cl, ci) => `
+    <div class="cluster-group">
+      <div class="cluster-header" onclick="toggleCluster(${ci})">
+        <span class="chevron">&#9654;</span>
+        <span class="cluster-name">${esc(cl.name)}</span>
+        <span class="cluster-count">${cl.size} records</span>
+        <span class="cluster-best-type"><span class="type-badge ${cl.bestType}">${typeLabel[cl.bestType] || cl.bestType}</span></span>
+      </div>
+      <div class="cluster-body" id="cluster-body-${ci}">
+        <div class="cluster-contacts">
+          ${cl.contacts.map(c => {
+            const isSurvivor = cl.survivorId && String(c.id) === String(cl.survivorId);
+            const scorePercent = typeof c.survivor_score === 'number' ? (c.survivor_score * 100).toFixed(0) + '%' : '';
+            const actDate = c.last_activity_date && c.last_activity_date !== '\u2014' ? new Date(c.last_activity_date).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'}) : '\u2014';
+            const stage = c.lifecycle_stage && c.lifecycle_stage !== '\u2014' ? c.lifecycle_stage : '\u2014';
+            return `
+            <div class="cluster-contact-card ${isSurvivor ? 'is-survivor' : ''}">
+              ${isSurvivor ? '<span class="cc-survivor">Keep</span>' : '<span class="cc-merge-badge">Merge</span>'}
+              <div class="cc-name">${esc(c.name)}</div>
+              ${scorePercent ? `<div class="cc-score" title="Survivor score">${scorePercent}</div>` : ''}
+              <div class="cc-field"><span class="cc-label">ID</span><span class="cc-val" style="font-family:var(--mono);font-size:11px;">${esc(c.id)}</span></div>
+              <div class="cc-field"><span class="cc-label">Email</span><span class="cc-val">${esc(c.email || '\u2014')}</span></div>
+              <div class="cc-field"><span class="cc-label">Company</span><span class="cc-val">${esc(c.company || '\u2014')}</span></div>
+              <div class="cc-field"><span class="cc-label">Phone</span><span class="cc-val">${esc(c.phone || '\u2014')}</span></div>
+              <div class="cc-field"><span class="cc-label">Title</span><span class="cc-val">${esc(c.title || '\u2014')}</span></div>
+              <div class="cc-field"><span class="cc-label">Stage</span><span class="cc-val">${esc(stage)}</span></div>
+              <div class="cc-field"><span class="cc-label">Last active</span><span class="cc-val">${actDate}</span></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="cluster-matches">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Match evidence</div>
+          ${cl.matches.map(m => `
+            <div class="cluster-match-row">
+              <span class="type-badge ${m.match_type}" style="font-size:10px;padding:2px 6px;">${typeLabel[m.match_type]}</span>
+              <span class="conf-val">${(m.confidence_score*100).toFixed(0)}%</span>
+              <span class="cmr-explanation">${esc(m.explanation)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleCluster(ci) {
+  const body = document.getElementById(`cluster-body-${ci}`);
+  const header = body.previousElementSibling;
+  body.classList.toggle('open');
+  header.classList.toggle('open');
+}
+
+/* ===================== VIEW TOGGLE ===================== */
+
+function toggleView() {
+  viewMode = viewMode === 'pairs' ? 'clusters' : 'pairs';
+  const btn = document.getElementById('view-toggle');
+  btn.classList.toggle('active', viewMode === 'clusters');
+  btn.innerHTML = viewMode === 'clusters'
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg> Pairs view'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Cluster view';
+
+  document.getElementById('pairs-view').style.display = viewMode === 'pairs' ? 'block' : 'none';
+  document.getElementById('cluster-view').style.display = viewMode === 'clusters' ? 'block' : 'none';
+  render();
+}
+
+function render() {
+  if (viewMode === 'pairs') renderPairsTable();
+  else renderClusterView();
+}
+
+/* ===================== WIRING ===================== */
+
+// Sort
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (col === sortCol) { sortDir *= -1; }
+    else { sortCol = col; sortDir = col === 'confidence_score' ? -1 : 1; }
+    render();
+  });
+});
+
+// Filters
+['f-type', 'f-action'].forEach(id => document.getElementById(id).addEventListener('change', render));
+document.getElementById('f-search').addEventListener('input', render);
+
+// Load file
+function loadReport(report) {
+  if (!report?.summary || !Array.isArray(report.matches)) return;
+  DATA = report;
+  document.getElementById('report').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+  renderStats(report.summary);
+  renderBreakdown(report.match_breakdown || {});
+  render();
+  const at = report.generated_at ? new Date(report.generated_at).toLocaleString() : '';
+  document.getElementById('gen-at').textContent = at ? `Generated ${at}` : '';
+}
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { try { loadReport(JSON.parse(reader.result)); } catch(err) { alert('Invalid JSON: ' + err.message); } };
+  reader.readAsText(file);
+});
+
+// Auto-load
+fetch('deduplication_results.json').then(r => r.ok ? r.json() : null).then(d => { if(d) loadReport(d); }).catch(() => {});
+</script>
+</body>
+</html>

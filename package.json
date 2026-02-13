@@ -1,0 +1,14 @@
+{
+  "name": "hubspot-api-client",
+  "version": "1.0.0",
+  "description": "Filter and pull HubSpot CRM records via API",
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "main": "hubspot-fetch.js",
+  "scripts": {
+    "fetch": "node hubspot-fetch.js",
+    "search": "node hubspot-fetch.js"
+  }
+}

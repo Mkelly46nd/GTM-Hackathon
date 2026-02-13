@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(python:*)",
+      "Bash(start deduplication_report.html)",
+      "Bash(timeout:*)"
+    ]
+  }
+}

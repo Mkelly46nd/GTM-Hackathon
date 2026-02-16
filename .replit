@@ -1,0 +1,9 @@
+# Replit run configuration for Dedup App (backend + frontend)
+# Run button starts the shell script which runs FastAPI on 5000 and Next.js on PORT.
+
+[run]
+command = "bash run.sh"
+
+[env]
+# Replit sets PORT automatically. Next.js will listen on PORT.
+# NEXT_PUBLIC_API_URL left unset so the app uses relative /api (proxied to backend).

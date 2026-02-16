@@ -2,7 +2,15 @@
 
 MVP web app for running the contact/company deduplication engines, reviewing matches and clusters, approving items, and exporting to CSV or webhooks (Clay, n8n).
 
-## Setup
+## Run on Replit
+
+1. **Import** the repo on [Replit](https://replit.com) (Import from GitHub).
+2. Click **Run**. The first run will install backend and frontend dependencies, start the FastAPI API on port 5000, then start the Next.js app on Replit’s assigned port.
+3. Open the **Webview** (or the URL Replit shows). You should see the app at `/runs`; upload a CSV and run dedup as usual.
+
+No extra config is needed. The app uses relative `/api` URLs and Next.js proxies `/api` to the backend. Optional: add Secrets for `CLAY_WEBHOOK_URL` and `N8N_WEBHOOK_URL` if you use those exports.
+
+## Local setup
 
 ### Backend (FastAPI + SQLite)
 
@@ -34,11 +42,13 @@ MVP web app for running the contact/company deduplication engines, reviewing mat
    npm install
    ```
 
-2. Create `web/.env.local` with:
+2. For local dev, create `web/.env.local` with:
 
    ```
    NEXT_PUBLIC_API_URL=http://localhost:8000
    ```
+
+   (If you omit this, the frontend uses relative `/api` URLs, which only work when the Next.js dev server is proxying to the backend, e.g. on Replit.)
 
 3. Start the dev server:
 
